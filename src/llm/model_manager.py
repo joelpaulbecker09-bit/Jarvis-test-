@@ -4,10 +4,15 @@ JARVIS LLM Model Manager
 Zentraler Verwalter für LLM-Aufrufe, Modellwahl und Fallbacks.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from config.config import config
-from config.models import TaskType, DEFAULT_TASK_MODELS
+from config.models import DEFAULT_TASK_MODELS, TaskType
+from src.llm.base import LLMProvider
 from src.llm.ollama_provider import OllamaProvider
+from src.utils.logging import LLM, get_logger
+
+logger = get_logger(LLM)
 
 
 class ModelManager:
@@ -16,7 +21,7 @@ class ModelManager:
     Ermöglicht dynamischen Modellwechsel je nach Aufgabe.
     """
 
-    def __init__(self, provider: Optional[OllamaProvider] = None):
+    def __init__(self, provider: Optional[LLMProvider] = None):
         self.provider = provider or OllamaProvider()
         self.default_model = config.default_model
 
@@ -25,6 +30,33 @@ class ModelManager:
         Ermittelt das passende Modell für einen bestimmten Task-Typ.
         """
         return DEFAULT_TASK_MODELS.get(task_type, self.default_model)
+
+    def is_available(self) -> bool:
+        """
+        Prüft, ob der Provider erreichbar ist. Fehlt die Prüfung, gilt der
+        Provider als verfügbar (relevant für Test-Doubles).
+        """
+        checker = getattr(self.provider, "is_available", None)
+
+        if checker is None:
+            return True
+
+        try:
+            return bool(checker())
+        except Exception as error:
+            logger.warning(f"Verfügbarkeitsprüfung fehlgeschlagen: {error}")
+            return False
+
+    def available_models(self) -> List[str]:
+        lister = getattr(self.provider, "list_models", None)
+
+        if lister is None:
+            return []
+
+        try:
+            return list(lister())
+        except Exception:
+            return []
 
     def chat(
         self,
@@ -38,7 +70,7 @@ class ModelManager:
         Verarbeitet eine Chat-Anfrage mit dem ausgewählten Modell.
         """
         selected_model = model or self.get_model_for_task(task_type)
-        
+
         try:
             return self.provider.chat(
                 model=selected_model,
@@ -49,7 +81,9 @@ class ModelManager:
         except Exception as err:
             # Fallback auf Default-Modell, falls ein spezifisches Modell fehlschlägt
             if selected_model != self.default_model:
-                print(f"[MODEL MANAGER] Fallback von {selected_model} auf {self.default_model}")
+                logger.warning(
+                    f"Fallback von {selected_model} auf {self.default_model}"
+                )
                 return self.provider.chat(
                     model=self.default_model,
                     messages=messages,

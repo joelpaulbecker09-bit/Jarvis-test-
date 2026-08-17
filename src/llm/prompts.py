@@ -355,6 +355,57 @@ Wenn du unsicher bist, speichere NICHT.
 """
 
 
+TOOL_PROMPT_TEMPLATE = """
+============================================================
+WERKZEUGE
+============================================================
+
+JARVIS kann Werkzeuge benutzen. Ergänze dazu im JSON zwei Felder:
+
+  "tool": "<Name des Werkzeugs oder leer>",
+  "tool_arguments": {{}}
+
+Verfügbare Werkzeuge:
+
+{tool_descriptions}
+
+Regeln:
+
+- Uhrzeit, Datum und Wochentag NIEMALS raten, sondern current_time verwenden.
+- Rechenaufgaben immer über calculator lösen, nie selbst rechnen.
+- Aktuelle Informationen aus dem Internet über web_search holen.
+- Wenn kein Werkzeug nötig ist: "tool": ""
+- Erfinde keine Werkzeugnamen und keine Parameter.
+"""
+
+
+def build_analyzer_prompt(tool_descriptions: str = "") -> str:
+    """
+    Analyzer-Prompt, optional erweitert um die verfügbaren Werkzeuge.
+    """
+    if not tool_descriptions:
+        return ANALYZER_SYSTEM_PROMPT
+
+    return ANALYZER_SYSTEM_PROMPT + TOOL_PROMPT_TEMPLATE.format(
+        tool_descriptions=tool_descriptions
+    )
+
+
+def build_tool_result_prompt(tool_name: str, output: str) -> str:
+    """
+    Ergebnis eines Werkzeugs für die Antwortgenerierung.
+    """
+    return (
+        "============================================================\n"
+        "WERKZEUG-ERGEBNIS\n"
+        "============================================================\n\n"
+        f"Werkzeug: {tool_name}\n\n"
+        f"{output}\n\n"
+        "Dieses Ergebnis stammt aus einer echten Messung bzw. Quelle.\n"
+        "Verwende es als Tatsache und widersprich ihm nicht.\n"
+    )
+
+
 def build_system_prompt(memory_text: str, user_name: str = "Joel") -> str:
     return f"""
 Du bist JARVIS, ein persönlicher lokaler KI-Assistent.

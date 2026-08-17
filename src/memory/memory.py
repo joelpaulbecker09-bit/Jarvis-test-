@@ -1,6 +1,13 @@
 import sqlite3
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
+
+from src.memory import models
+from src.memory.models import MemoryEntry
+from src.memory.search import MatchResult, ScoredMemory, rank, resolve_single
+from src.utils.logging import MEMORY, get_logger
+
+logger = get_logger(MEMORY)
 
 
 class Memory:
@@ -28,46 +35,11 @@ class Memory:
     # ERLAUBTE WERTE
     # ============================================================
 
-    CATEGORIES = {
-        "Persönlichkeit",
-        "Musik",
-        "Spiele",
-        "Arbeit",
-        "Schule",
-        "Familie",
-        "Freunde",
-        "Hobbys",
-        "Vorlieben",
-        "Abneigungen",
-        "Ziele",
-        "Gewohnheiten",
-        "Sonstiges",
-    }
+    CATEGORIES = set(models.CATEGORIES)
 
-    MEMORY_TYPES = {
-        "Vorliebe",
-        "Abneigung",
-        "Fakt",
-        "Ziel",
-        "Gewohnheit",
-    }
+    MEMORY_TYPES = set(models.MEMORY_TYPES)
 
-    ENTITY_TYPES = {
-        "Person",
-        "Künstler",
-        "Band",
-        "Song",
-        "Album",
-        "Spiel",
-        "Film",
-        "Serie",
-        "Hobby",
-        "Tätigkeit",
-        "Ort",
-        "Gegenstand",
-        "Tier",
-        "Sonstiges",
-    }
+    ENTITY_TYPES = set(models.ENTITY_TYPES)
 
     # ============================================================
     # INITIALISIERUNG
@@ -110,10 +82,7 @@ class Memory:
 
         self._create_structure()
 
-        print(
-            f"[MEMORY] Datenbank: "
-            f"{self.database}"
-        )
+        logger.info(f"Datenbank: {self.database}")
 
     # ============================================================
     # DATENBANKSTRUKTUR
@@ -964,6 +933,106 @@ class Memory:
         row = cursor.fetchone()
 
         return row[0] if row else 0
+
+    # ============================================================
+    # TYPISIERTER ZUGRIFF
+    # ============================================================
+
+    def entries(self) -> List[MemoryEntry]:
+        """
+        Alle Memories als typisierte Einträge (inklusive ID).
+        """
+
+        return [
+            MemoryEntry.from_row_with_id(row)
+            for row in self.get_all_with_ids()
+        ]
+
+    def entries_by_category(
+        self,
+        category: str
+    ) -> List[MemoryEntry]:
+        """
+        Alle Memories einer Kategorie als typisierte Einträge.
+        """
+
+        return [
+            entry
+            for entry in self.entries()
+            if entry.category.strip().lower() == str(category).strip().lower()
+        ]
+
+    # ============================================================
+    # BEWERTETE SUCHE
+    # ============================================================
+
+    def search(
+        self,
+        query: str,
+        category: Optional[str] = None,
+        memory_type: Optional[str] = None,
+        limit: int = 10,
+        min_score: float = 0.55
+    ) -> List[ScoredMemory]:
+        """
+        Sucht Memories nach Relevanz statt nach exakter Übereinstimmung.
+
+        Kombiniert Kategorie-/Typ-Filter mit der Bewertung aus
+        src.memory.search.
+        """
+
+        candidates = self.entries()
+
+        if category:
+            normalized_category = category.strip().lower()
+            candidates = [
+                entry
+                for entry in candidates
+                if entry.category.strip().lower() == normalized_category
+            ]
+
+        if memory_type:
+            normalized_type = memory_type.strip().lower()
+            candidates = [
+                entry
+                for entry in candidates
+                if entry.memory_type.strip().lower() == normalized_type
+            ]
+
+        return rank(
+            candidates,
+            query,
+            min_score=min_score,
+            limit=limit
+        )
+
+    def resolve(
+        self,
+        query: str,
+        category: Optional[str] = None
+    ) -> MatchResult:
+        """
+        Bestimmt den einen gemeinten Eintrag.
+
+        Wird für LOESCHEN und AENDERN verwendet: Ist der Treffer nicht
+        eindeutig, meldet das Ergebnis 'ambiguous' und JARVIS ändert nichts.
+        """
+
+        result = MatchResult(best=None, ambiguous=False, candidates=())
+
+        if category:
+            result = resolve_single(
+                self.entries_by_category(category),
+                query
+            )
+
+        if not result.found and not result.ambiguous:
+            result = resolve_single(
+                self.entries(),
+                query
+            )
+
+        return result
 
     # ============================================================
     # DATENBANK SCHLIESSEN
