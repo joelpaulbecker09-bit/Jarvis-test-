@@ -1,0 +1,22 @@
+# JARVIS – Abhängigkeiten
+#
+# Alles läuft lokal und kostenlos. Nur ollama wird zwingend gebraucht,
+# der Rest erweitert JARVIS um Stimme, Mikrofon und Systemzugriff.
+
+# Denken (Pflicht)
+ollama>=0.3.0
+
+# Systemwerkzeuge: Prozesse, CPU, Arbeitsspeicher (empfohlen)
+psutil>=5.9.0
+
+# Sprachausgabe (mindestens eine Variante)
+pyttsx3>=2.90
+
+# Spracherkennung (offline)
+faster-whisper>=1.0.0
+
+# Mikrofonaufnahme
+sounddevice>=0.4.6
+
+# Oberfläche: tkinter gehört zu Python.
+# Linux: sudo apt install python3-tk

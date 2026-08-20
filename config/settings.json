@@ -1,0 +1,10 @@
+{
+  "default_model": "qwen3:8b",
+  "fast_model": "gemma:2b",
+  "reasoning_model": "gemma4:latest",
+  "vision_model": "qwen3-vl:latest",
+  "ollama_host": "http://localhost:11434",
+  "max_history_messages": 10,
+  "data_dir": "data",
+  "db_name": "memory.db"
+}

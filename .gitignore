@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# lokale Daten
+data/*.db
+data/*.db-journal
+logs/
+
+# Secrets
+.env
+
+# Modelle / Caches
+models/
+.pytest_cache/
